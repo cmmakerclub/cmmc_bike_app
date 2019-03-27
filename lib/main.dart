@@ -14,7 +14,18 @@ import 'package:flutter/services.dart';
 import "package:pointycastle/pointycastle.dart";
 
 void main() {
-  runApp(new FlutterBlueApp());
+  runApp(new CMMCApp());
+}
+
+class CMMCApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'CMMC Bike',
+      debugShowCheckedModeBanner: false,
+      home: FlutterBlueApp(),
+    );
+  }
 }
 
 class FlutterBlueApp extends StatefulWidget {
@@ -50,10 +61,11 @@ class _FlutterBlueAppState extends State<FlutterBlueApp> {
   String barcode = "";
   String connectToDeviceName = "";
   bool isConnecting = false;
+  bool isAuth = false;
   @override
   void initState() {
     super.initState();
-    
+
     // Immediately get the state of FlutterBlue
     _flutterBlue.state.then((s) {
       setState(() {
@@ -80,7 +92,7 @@ class _FlutterBlueAppState extends State<FlutterBlueApp> {
   }
 
   Future scanQR() async {
-    
+
     try {
       String barcode = await BarcodeScanner.scan();
       setState(() {
@@ -180,11 +192,12 @@ class _FlutterBlueAppState extends State<FlutterBlueApp> {
     deviceStateSubscription = null;
     deviceConnection?.cancel();
     deviceConnection = null;
-
+    
     setState(() {
       scanResults = new Map();
       connectToDeviceName = "";
       isConnecting = false;
+      isAuth = false;
       device = null;
     });
   }
@@ -273,7 +286,32 @@ class _FlutterBlueAppState extends State<FlutterBlueApp> {
           print('onValueChanged $d');
           if (utf8.decode(d) == "OK")
           {
-            print("ok");
+            print("Auth");
+            isAuth = true;
+          }
+          if (utf8.decode(d) == "DISCONNECT")
+          {
+            print("disconnect");
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                // return object of type Dialog
+                return AlertDialog(
+                  title: new Text("Have a good day"),
+                  content: new Text("you have finish using deivce."),
+                  actions: <Widget>[
+                    // usually buttons at the bottom of the dialog
+                    new FlatButton(
+                      child: new Text("Close"),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ],
+                );
+              },
+            );
+
             _disconnect();
           }
         });
@@ -297,14 +335,16 @@ class _FlutterBlueAppState extends State<FlutterBlueApp> {
       return null;
     }
     if (isScanning) {
-      return new FloatingActionButton(
-        child: new Icon(Icons.stop),
+      return new Center( child: new FloatingActionButton.extended(
+        icon: new Icon(Icons.stop),
         onPressed: _stopScan,
         backgroundColor: Colors.red,
-      );
+        label: Text("Stop")
+      ));
     } else {
-      return new FloatingActionButton(
-             child: new Icon(Icons.search), onPressed: scanQR);
+      return new Center( child: new FloatingActionButton.extended(
+        icon: new Icon(Icons.search), onPressed: scanQR, label: Text("Scan QR"),
+      ));
     }
   }
 
@@ -447,23 +487,51 @@ class _FlutterBlueAppState extends State<FlutterBlueApp> {
     return new LinearProgressIndicator();
   }
 
+  Future<Null>_showDialog() async {
+  return showDialog < Null > (
+    context: context,
+    barrierDismissible: true,
+    builder: (BuildContext context) {
+      return new AlertDialog(
+        title: Text("title"),
+        content: Container(
+          height: 150.0,
+          child: Text("fff")),
+      );
+    },
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     var tiles = new List<Widget>();
     if (state != BluetoothState.on) {
       tiles.add(_buildAlertTile());
     }
-    if (isConnected) {
+
+    if (isConnected && isAuth) {
+      tiles.add(Text(""));
+      tiles.add(Text(""));
+      tiles.add(Text(""));
+
+      tiles.add(new Center(child: new FloatingActionButton.extended(
+        icon: new Icon(Icons.play_arrow),
+        onPressed: _stopScan,
+        backgroundColor: Colors.lightBlue,
+        label: Text("Using device")
+      )));
+    }
+    else if (isConnected) {
       tiles.add(_buildDeviceStateTile());
       tiles.addAll(_buildServiceTiles());
-
-    } else {
+    } 
+    else {
       if (isConnecting == false) {
         _tryConnectBle();
       }
     }
-    return new MaterialApp(
-      home: new Scaffold(
+    return
+      new Scaffold(
         appBar: new AppBar(
           title: const Text('CMMC Bike'),
           actions: _buildActionButtons(),
@@ -477,7 +545,6 @@ class _FlutterBlueAppState extends State<FlutterBlueApp> {
             )
           ],
         ),
-      ),
     );
   }
 }
